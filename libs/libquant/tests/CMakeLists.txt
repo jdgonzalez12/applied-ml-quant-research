@@ -7,6 +7,7 @@ add_executable(libquant_tests
     test_svd.cpp
     test_least_squares.cpp
     test_condition.cpp
+    test_general_eigen.cpp
 )
 target_link_libraries(libquant_tests PRIVATE libquant Catch2::Catch2WithMain Eigen3::Eigen)
 qmp_set_warnings(libquant_tests)
