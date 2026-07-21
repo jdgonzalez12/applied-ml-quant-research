@@ -1,0 +1,6 @@
+add_executable(libquant_bench bench_linear_algebra.cpp)
+target_link_libraries(libquant_bench PRIVATE libquant Eigen3::Eigen)
+qmp_set_warnings(libquant_bench)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(libquant_bench PRIVATE -O3)
+endif()
