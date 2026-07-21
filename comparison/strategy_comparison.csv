@@ -1,0 +1,4 @@
+strategy,sharpe,max_drawdown,hit_rate,annualized_return
+P2: RMT/PCA stat-arb,-0.00776719,0.0896508,0.489922,-0.000800791
+P3: Kalman-adaptive pairs,0.605648,0.230121,0.216242,0.0599348
+P3: Static-OLS pairs (baseline),0.171547,0.422336,0.248106,0.0129689
