@@ -1,0 +1,6 @@
+add_executable(libquant_backtest_tests test_metrics.cpp)
+target_link_libraries(libquant_backtest_tests PRIVATE libquant_backtest Catch2::Catch2WithMain)
+qmp_set_warnings(libquant_backtest_tests)
+
+include(Catch)
+catch_discover_tests(libquant_backtest_tests)
