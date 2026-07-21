@@ -1,0 +1,3 @@
+method,sharpe,max_drawdown,turnover,hit_rate,total_return,annualized_return
+kalman,0.605648,0.230121,0.175865,0.216242,2.28335,0.0599348
+static,0.171547,0.422336,0.168092,0.248106,0.301064,0.0129689
