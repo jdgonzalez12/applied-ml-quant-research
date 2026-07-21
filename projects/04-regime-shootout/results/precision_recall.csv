@@ -1,0 +1,4 @@
+method,precision,recall,threshold,flagged_days
+dmd,0.366667,0.280612,-0.505686,150
+tda,0.0333333,0.0357143,0.193544,210
+kalman,0.412621,0.433673,3.94347,206

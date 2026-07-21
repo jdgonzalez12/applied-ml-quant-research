@@ -1,0 +1,7 @@
+crisis,method,first_flag_date,lead_days_before_start
+2008 GFC,dmd,2008-10-27,n/a
+2008 GFC,tda,2009-03-23,n/a
+2008 GFC,kalman,2008-09-04,n/a
+2020 COVID,dmd,2020-03-10,n/a
+2020 COVID,tda,none,n/a
+2020 COVID,kalman,2020-02-24,n/a

@@ -1,0 +1,7 @@
+crisis,method,lag_days
+2008 GFC,dmd,56.0
+2008 GFC,tda,203.0
+2008 GFC,kalman,3.0
+2020 COVID,dmd,19.0
+2020 COVID,tda,
+2020 COVID,kalman,4.0
