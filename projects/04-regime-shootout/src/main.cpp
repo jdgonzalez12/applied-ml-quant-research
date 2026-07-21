@@ -18,6 +18,7 @@
 #include "csv_loader.hpp"
 #include "dmd.hpp"
 #include "kalman_filter.hpp"
+#include "mapper.hpp"
 #include "persistent_homology.hpp"
 
 #ifndef QMP_DATA_DIR
@@ -221,6 +222,49 @@ int main() {
             }
             leadlag_out << crisis.name << "," << method << "," << first_flag << ",n/a\n";
         }
+    }
+
+    // --- Mapper: a qualitative "shape of the market" exploration. ---------
+    // Filter function f(day) = ||return vector||_2 across the 9 sectors, a
+    // simple scalar proxy for "how extreme was this day." Points are the
+    // 9-dimensional return vectors themselves, so within-interval
+    // clustering groups days by how similarly the whole sector complex
+    // moved, not just by overall magnitude.
+    {
+        std::vector<std::vector<double>> points(T);
+        std::vector<double> filter(T);
+        for (std::size_t t = 0; t < T; ++t) {
+            std::vector<double> pt(sectors.size());
+            double norm = 0.0;
+            for (std::size_t j = 0; j < sectors.size(); ++j) {
+                pt[j] = R(t, j);
+                norm += R(t, j) * R(t, j);
+            }
+            points[t] = pt;
+            filter[t] = std::sqrt(norm);
+        }
+
+        MapperGraph graph = compute_mapper(points, filter, 25, 0.3);
+        std::cout << "Mapper: " << graph.nodes.size() << " nodes, " << graph.edges.size() << " edges.\n";
+
+        std::ofstream nodes_out(std::string(QMP_RESULTS_DIR) + "/mapper_nodes.csv");
+        nodes_out << "node_id,interval,size,filter_center,crisis_fraction\n";
+        for (std::size_t i = 0; i < graph.nodes.size(); ++i) {
+            const auto& node = graph.nodes[i];
+            std::size_t crisis_days = 0;
+            for (int member : node.members) {
+                const std::string& date = panel.dates[static_cast<std::size_t>(member) + 1];
+                for (const auto& c : crises)
+                    if (in_window(date, c)) { ++crisis_days; break; }
+            }
+            double frac = static_cast<double>(crisis_days) / static_cast<double>(node.members.size());
+            nodes_out << i << "," << node.interval << "," << node.members.size() << "," << node.filter_center << ","
+                      << frac << "\n";
+        }
+
+        std::ofstream edges_out(std::string(QMP_RESULTS_DIR) + "/mapper_edges.csv");
+        edges_out << "node_a,node_b,shared\n";
+        for (const auto& e : graph.edges) edges_out << e.a << "," << e.b << "," << e.shared << "\n";
     }
 
     std::cout << "Wrote results to " << QMP_RESULTS_DIR << "\n";

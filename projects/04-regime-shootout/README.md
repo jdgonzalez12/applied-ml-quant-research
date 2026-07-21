@@ -80,7 +80,27 @@ tracked level — is a simple CUSUM-style break statistic: any day whose
 return is unusually large relative to recent behavior lights it up
 immediately, with no rolling-window lag.
 
-### 1.4 Evaluation protocol
+### 1.4 Mapper — a qualitative "shape of the market" exploration
+
+A secondary, exploratory TDA method (Singh, Mémoli & Carlsson 2007;
+Carlsson & Vejdemo-Johansson, the Mapper chapter): rather than the precise
+birth/death pairs of persistent homology, Mapper produces a directly
+visualizable graph summarizing a point cloud's shape. Given a scalar
+**filter function** $f$, the algorithm ([`mapper.hpp`](include/mapper.hpp)):
+covers the range of $f$ with overlapping intervals; within each interval,
+clusters the points whose $f$-value falls inside it (single-linkage,
+cut at that interval's own median pairwise distance); and creates one
+graph node per cluster, with an edge between any two nodes (necessarily
+from different, overlapping intervals) whose point sets share a member.
+
+Applied here to the full 2005–2026 daily panel of 9-sector return vectors,
+with filter $f(\text{day}) = \|r_t\|_2$ (a simple scalar proxy for
+"how extreme was this day across the whole sector complex"). Two exact
+tests validate the implementation: a filter with a genuine gap between two
+point clusters never produces an edge crossing that gap, and a dense,
+evenly-spaced line of points produces a single connected graph.
+
+### 1.5 Evaluation protocol
 
 Ground truth: two hand-labeled crisis windows, **2008-09-01 to 2009-03-31**
 (Lehman collapse through the market bottom) and **2020-02-20 to
@@ -143,6 +163,30 @@ persistence-entropy statistic instead of max persistence), not a
 implementation defect — the two closed-form geometric tests confirm the
 persistent-homology computation itself is exact.
 
+### Mapper: a cleaner topological signal than persistent homology
+
+Where $H_1$ persistence found little structure, Mapper — applied to the
+full 20-year daily sector-return panel, not a rolling window — finds
+something genuinely clean:
+
+![Mapper graph of daily sector-return dynamics](plots/mapper_graph.png)
+
+Crisis-day fraction rises **monotonically** with the filter value, from
+essentially 0% among the large, densely-connected low-stress cluster on
+the left to 100% among the small, often-**disconnected** nodes on the far
+right. That disconnection is the interesting part: several of the most
+extreme days form isolated nodes with no edge back to the main graph at
+all, meaning their 9-dimensional return pattern wasn't just "the calm
+pattern, scaled up" — it was a qualitatively different configuration
+across sectors. This is a genuine, positive topological finding, and it is
+worth being explicit about *why* it succeeds where §2's rolling-window
+$H_1$ persistence struggled: Mapper here uses the full 9-dimensional
+sector-return vector directly as its point cloud (shape across assets,
+at daily resolution), while the persistent-homology signal used a 3D
+Takens embedding of a single scalar series (SPY returns, shape *over time*
+in one instrument). They are, in effect, answering different topological
+questions, and this dataset has more structure in the cross-sectional one.
+
 ## 3. Reproducing
 
 ```
@@ -153,7 +197,11 @@ cmake --build build --target project04_regime_shootout
 
 Unit tests (`project04_tests`) validate `compute_dmd` against a synthetic
 linear system with known eigenvalues (a damped rotation matrix) and
-against a pure-decay system (correctly negative growth rate), and validate
+against a pure-decay system (correctly negative growth rate); validate
 persistent homology against two exact closed-form cases (unit square: one
 $H_1$ feature, birth $=1$, death $=\sqrt2$; equilateral triangle: none)
-plus a relative comparison (a pentagon ring vs. a tight point cluster).
+plus a relative comparison (a pentagon ring vs. a tight point cluster); and
+validate `compute_mapper` against a filter with a genuine gap (never an
+edge crossing it) and a dense evenly-spaced line (produces one connected
+graph, verified by BFS reachability) — 18 assertions across 8 test cases
+total for this project.

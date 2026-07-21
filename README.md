@@ -93,7 +93,7 @@ ctest --test-dir build --output-on-failure
 ```
 
 That builds and runs all four projects' C++ pipelines and their full unit
-test suite (597 assertions across 47 test cases as of this writing, all
+test suite (632 assertions across 53 test cases as of this writing, all
 cross-checked against Eigen where a from-scratch/reference comparison
 applies). Each project's `results/*.csv` are already committed, so the
 figures embedded in every README can be regenerated without rebuilding:
