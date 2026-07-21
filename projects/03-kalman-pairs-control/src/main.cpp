@@ -25,6 +25,7 @@
 #include "adf_test.hpp"
 #include "csv_loader.hpp"
 #include "kalman_filter.hpp"
+#include "riccati_lqr.hpp"
 
 #ifndef QMP_DATA_DIR
 #define QMP_DATA_DIR "data/raw/equities"
@@ -47,6 +48,17 @@ double rolling_std(const std::vector<double>& v, std::size_t end, std::size_t wi
         s += d * d;
     }
     return std::sqrt(s / static_cast<double>(window - 1));
+}
+
+double mean_of(const std::vector<double>& v) {
+    double s = 0.0;
+    for (double x : v) s += x;
+    return v.empty() ? 0.0 : s / static_cast<double>(v.size());
+}
+double stdev_of(const std::vector<double>& v, double m) {
+    double s = 0.0;
+    for (double x : v) { double d = x - m; s += d * d; }
+    return v.size() > 1 ? std::sqrt(s / static_cast<double>(v.size() - 1)) : 0.0;
 }
 
 struct MethodState {
@@ -186,6 +198,47 @@ int main() {
               << "  AnnRet " << metrics_kalman.annualized_return << "\n";
     std::cout << "=== Static ===  Sharpe " << metrics_static.sharpe << "  MaxDD " << metrics_static.max_drawdown
               << "  AnnRet " << metrics_static.annualized_return << "\n";
+
+    // --- LQR optimal execution (Almgren-Chriss toy) vs. TWAP baseline. ---
+    // Illustrative, not calibrated to a real trading book: risk aversion and
+    // impact-cost coefficients are round, documented numbers (see README),
+    // chosen only so the two schedules' relative shapes and costs are
+    // meaningful. CVX's own realized daily-return volatility sets the scale
+    // of the holding-risk term.
+    {
+        std::vector<double> cvx_ret;
+        for (std::size_t t = 1; t < T; ++t) cvx_ret.push_back(y[t] - y[t - 1]);
+        double cvx_mean = mean_of(cvx_ret);
+        double cvx_sigma = stdev_of(cvx_ret, cvx_mean);
+
+        const double X0 = 100000.0;   // shares to liquidate
+        const int horizon = 20;        // trading periods
+        const double risk_aversion = 5e-7;
+        const double Q = risk_aversion * cvx_sigma * cvx_sigma;
+        const double R = 1e-8;         // temporary-impact cost per (share/period)^2
+        const double Qf = 1e6 * Q + 1.0;  // large terminal penalty forces near-full liquidation
+
+        auto lqr = solve_lqr_execution(X0, horizon, Q, R, Qf);
+        auto twap = solve_twap_execution(X0, horizon, Q, R);
+
+        std::ofstream lqr_out(std::string(QMP_RESULTS_DIR) + "/lqr_execution.csv");
+        lqr_out << "period,inventory_lqr,trade_lqr,inventory_twap,trade_twap\n";
+        for (int k = 0; k <= horizon; ++k) {
+            lqr_out << k << "," << lqr.inventory[static_cast<std::size_t>(k)] << ",";
+            lqr_out << (k < horizon ? std::to_string(lqr.trades[static_cast<std::size_t>(k)]) : std::string(""));
+            lqr_out << "," << twap.inventory[static_cast<std::size_t>(k)] << ",";
+            lqr_out << (k < horizon ? std::to_string(twap.trades[static_cast<std::size_t>(k)]) : std::string(""));
+            lqr_out << "\n";
+        }
+        std::ofstream lqr_summary(std::string(QMP_RESULTS_DIR) + "/lqr_summary.csv");
+        lqr_summary << "schedule,total_cost\n";
+        lqr_summary << "lqr," << lqr.total_cost << "\n";
+        lqr_summary << "twap," << twap.total_cost << "\n";
+
+        std::cout << "\n=== LQR execution ===  total_cost=" << lqr.total_cost << "  (CVX daily sigma=" << cvx_sigma
+                  << ")\n";
+        std::cout << "=== TWAP baseline  ===  total_cost=" << twap.total_cost << "\n";
+    }
     std::cout << "Wrote results to " << QMP_RESULTS_DIR << "\n";
     return 0;
 }

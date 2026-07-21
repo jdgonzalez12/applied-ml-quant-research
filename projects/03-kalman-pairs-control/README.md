@@ -117,15 +117,66 @@ assumption**, which is the practical argument for using a Kalman filter
 system, independent of whether the underlying relationship satisfies a
 formal stationarity test.
 
-### Scope note
+## 4. Secondary demonstration: LQR optimal execution
 
-An optimal-execution LQR extension (discrete-time Riccati recursion,
-Almgren–Chriss style) was considered as a secondary demonstration of
-control theory but is deliberately out of scope for this delivery — the
-Kalman-filter estimation comparison above is this project's core,
-completed result.
+A discrete-time linear-quadratic regulator (Brunton & Kutz, "Optimal
+full-state control: the LQR"), applied to the classic Almgren–Chriss
+optimal-execution problem: liquidate an inventory $x_0$ over $T$ periods,
+trading off holding risk against market impact.
 
-## 3. Reproducing
+### 4.1 Formulation and the Bellman/Riccati derivation
+
+State $x_{k+1} = x_k - u_k$ (selling $u_k$ shares reduces inventory), cost
+$\sum_{k=0}^{T-1}(Q x_k^2 + R u_k^2) + Q_f x_T^2$: $Q$ penalizes holding
+risk (larger, longer-held inventory is riskier), $R$ penalizes per-period
+market impact (roughly quadratic in trade size, per Almgren–Chriss), and a
+large terminal penalty $Q_f$ approximates the constraint "fully liquidated
+by the deadline." The finite-horizon Bellman equation for this LQ problem
+is solved backward — $P_T = Q_f$, then for $k=T-1,\dots,0$:
+
+$$K_k = \frac{P_{k+1}}{R+P_{k+1}}, \qquad P_k = Q + \frac{P_{k+1}R}{R+P_{k+1}},$$
+
+giving the optimal feedback law $u_k = K_k x_k$
+([`riccati_lqr.hpp`](include/riccati_lqr.hpp)).
+
+**A numerical-stability bug the tests caught:** the textbook Riccati update
+$P_k = Q + P_{k+1} - P_{k+1}^2/(R+P_{k+1})$ is mathematically correct but
+subtracts two $O(P_{k+1})$ terms to produce an $O(R)$ result whenever
+$Q_f \gg R$ — exactly the regime this problem lives in, since the terminal
+penalty is deliberately large. That's catastrophic cancellation: a test
+asserting that $Q=0$ collapses the optimal schedule to uniform (TWAP)
+slicing failed with a 3.4% discrepancy that had nothing to do with the
+model and everything to do with floating-point precision loss. The fix is
+the algebraically identical but numerically stable $P_k = Q +
+P_{k+1}R/(R+P_{k+1})$ (a product/quotient, not a subtraction of large
+terms) — shown above, and now what the code actually computes.
+
+### 4.2 Result
+
+$x_0=100{,}000$ shares, $T=20$ periods, $Q$ set from CVX's realized daily
+return volatility ($\sigma \approx 0.0178$) scaled by an illustrative risk
+aversion coefficient, $R$ an illustrative impact-cost coefficient (see
+`main.cpp` for the exact constants — these are round, documented numbers
+for demonstrating the mechanism, not a calibrated production execution
+model):
+
+![LQR-optimal vs. TWAP execution](plots/lqr_execution.png)
+
+| Schedule | Total cost |
+|---|---|
+| LQR-optimal | **13.56** |
+| TWAP (naive uniform) | 16.35 |
+
+The optimal schedule reproduces the textbook Almgren–Chriss shape exactly:
+front-loaded, exponentially decaying trade sizes, trading more aggressively
+while holding-risk exposure is highest and tapering off as the position
+shrinks — a **17% cost reduction** over uniform slicing under this cost
+functional. `test_lqr.cpp` also verifies the DP solution can never cost
+more than TWAP (true by construction, since LQR is the argmin over exactly
+this cost functional) and that higher risk aversion front-loads the first
+trade further.
+
+## 5. Reproducing
 
 ```
 cmake --build build --target project03_kalman_pairs
@@ -136,6 +187,9 @@ cmake --build build --target project03_kalman_pairs
 Unit tests (`project03_tests`) validate `KalmanFilter1D` against a
 synthetic constant-beta system (converges to the true value) and its
 steady-state gain against the closed-form discrete Riccati fixed point,
-and validate `adf_test` against both a synthetic stationary AR(1) series
+validate `adf_test` against both a synthetic stationary AR(1) series
 (correctly rejects the unit-root null) and a synthetic pure random walk
-(correctly fails to reject it).
+(correctly fails to reject it), and validate `solve_lqr_execution` against
+TWAP dominance, near-full liquidation, the exact Q=0 uniform-slicing
+special case (which caught the cancellation bug in §4.1), and risk-aversion
+sensitivity — 34 assertions across 8 test cases total for this project.

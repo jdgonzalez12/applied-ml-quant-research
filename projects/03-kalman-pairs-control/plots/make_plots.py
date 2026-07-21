@@ -60,8 +60,31 @@ def plot_equity_comparison() -> None:
     plt.close(fig)
 
 
+def plot_lqr_execution() -> None:
+    df = pd.read_csv(RESULTS / "lqr_execution.csv")
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.5))
+
+    ax1.plot(df["period"], df["inventory_lqr"], color=PALETTE["strategy"], marker="o", markersize=3, label="LQR-optimal")
+    ax1.plot(df["period"], df["inventory_twap"], color=PALETTE["short"], linestyle="--", marker="o", markersize=3, label="TWAP")
+    ax1.set_xlabel("Period")
+    ax1.set_ylabel("Remaining inventory (shares)")
+    ax1.set_title("Liquidation trajectory")
+    ax1.legend()
+
+    ax2.bar(df["period"][:-1], df["trade_lqr"][:-1], width=0.4, align="edge", color=PALETTE["strategy"], label="LQR-optimal")
+    ax2.bar(df["period"][:-1] - 0.4, df["trade_twap"][:-1], width=0.4, align="edge", color=PALETTE["short"], label="TWAP")
+    ax2.set_xlabel("Period")
+    ax2.set_ylabel("Shares traded")
+    ax2.set_title("Per-period trade size")
+    ax2.legend()
+
+    savefig(fig, str(PLOTS / "lqr_execution.png"))
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     plot_beta()
     plot_signal("kalman", "Spread z-score (Kalman-adaptive hedge ratio)")
     plot_signal("static", "Spread z-score (static-OLS hedge ratio)")
     plot_equity_comparison()
+    plot_lqr_execution()
